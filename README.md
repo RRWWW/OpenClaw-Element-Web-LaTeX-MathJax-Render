@@ -1,6 +1,6 @@
 # OpenClaw-Element Web LaTeX-MathJaX Render
 
-一個Chromium extension 擴展，用於在Matrix.org Element Web & OpenClaw controlUI聊天中本地渲染LaTeX數學公式，使用MathJax。
+一個 Chromium extension 擴展，用於在Matrix.org Element Web & OpenClaw controlUI聊天中本地渲染LaTeX數學公式，使用MathJax。
 
 ## 功能
 
@@ -63,7 +63,6 @@
 
 - 使用MathJax 4.x進行渲染
 - 支持SVG輸出
-- 包含多種擴展：ams, boldsymbol, color, enclose等
 
 ## 許可證
 
@@ -81,7 +80,7 @@ v1.6
 
 # OpenClaw-Element Web LaTeX-MathJaX Render (English)
 
-A Chrome extension for local LaTeX math rendering in Matrix.org Element Web & OpenClaw controlUI chat using MathJax.
+A Chromium extension for local LaTeX math rendering in Matrix.org Element Web & OpenClaw controlUI chat using MathJax.
 
 ## Features
 
@@ -144,7 +143,6 @@ Click on the rendered SVG image to copy the LaTeX code.
 
 - Uses MathJax 4.x for rendering
 - Supports SVG output
-- Includes various extensions: ams, boldsymbol, color, enclose, etc.
 
 ## License
 
