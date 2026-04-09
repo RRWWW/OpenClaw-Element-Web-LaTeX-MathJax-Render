@@ -9,6 +9,13 @@
 - 輕量級，無需額外權限
 - 點選SVG可複製公式等
 
+## 相關鏈接
+
+- [Matrix.org](https://matrix.org/) - 去中心化通訊協議
+- [Element Web](https://app.element.io/) - Matrix的Web客戶端
+- [OpenClaw](https://openclaw.org/) - OpenClaw controlUI聊天平台
+- [MathJax](https://www.mathjax.org/) - 數學公式渲染引擎
+
 ## 支持的瀏覽器
 
 - Chrome
@@ -92,6 +99,13 @@ A Chromium extension for local LaTeX math rendering in Matrix.org Element Web & 
 - Supports all MathJax features
 - Lightweight, no additional permissions required
 - Click SVG to copy formulas, etc.
+
+## Related Links
+
+- [Matrix.org](https://matrix.org/) - Decentralized communication protocol
+- [Element Web](https://app.element.io/) - Web client for Matrix
+- [OpenClaw](https://openclaw.org/) - OpenClaw controlUI chat platform
+- [MathJax](https://www.mathjax.org/) - Mathematical formula rendering engine
 
 ## Supported Browsers
 
