@@ -64,6 +64,10 @@
 - 使用MathJax 4.x進行渲染
 - 支持SVG輸出
 
+## TODO
+
+- 支持多種擴展：ams, boldsymbol, color, enclose等
+
 ## 許可證
 
 MIT License
@@ -143,6 +147,10 @@ Click on the rendered SVG image to copy the LaTeX code.
 
 - Uses MathJax 4.x for rendering
 - Supports SVG output
+
+## TODO
+
+- Support various extensions: ams, boldsymbol, color, enclose, etc.
 
 ## License
 
