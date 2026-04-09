@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ':*)",
+      "Bash(node -e ':*)",
+      "WebFetch(domain:data.jsdelivr.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(sort -k5 -n -r)",
+      "Bash(sort -k5 -n)",
+      "Bash(start msedge:*)",
+      "WebSearch"
+    ]
+  }
+}

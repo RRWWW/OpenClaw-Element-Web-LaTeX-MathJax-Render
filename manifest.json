@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Element LaTeX Local",
+  "version": "1.6",
+  "description": "Local LaTeX Renderer for Element",
+  "permissions": ["scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["inject_url.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": [
+        "content.js",
+        "tex-mml-svg.js",
+        "extensions_bundle.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["fonts/svg/dynamic/*.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
