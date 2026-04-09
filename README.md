@@ -73,17 +73,6 @@
 - 行內公式：`$...$`
 - 區塊公式：`$$...$$`
 
-## 關於 LaTeX
-
-LaTeX 是一種高質量的排版系統，特別適用於數學和科學文檔。這個擴展支持在聊天中使用LaTeX語法渲染數學公式。
-
-### 基本語法
-
-- 行內公式：`$...$`
-- 區塊公式：`$$...$$`
-
-例如：`$E = mc^2$` 會渲染為愛因斯坦的質能方程。
-
 - 使用MathJax 4.x進行渲染
 - 支持SVG輸出
 
@@ -172,17 +161,6 @@ After installation, the extension will automatically render LaTeX formulas in El
 - Block formulas: `$$...$$`
 
 Click on the rendered SVG image to copy the LaTeX code.
-
-## About LaTeX
-
-LaTeX is a high-quality typesetting system particularly suitable for mathematical and scientific documents. This extension supports rendering mathematical formulas using LaTeX syntax in chat.
-
-### Basic Syntax
-
-- Inline formulas: `$...$`
-- Block formulas: `$$...$$`
-
-For example: `$E = mc^2$` will render as Einstein's mass-energy equivalence equation.
 
 ## Technical Details
 
