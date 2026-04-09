@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Element LaTeX Local",
+  "name": "OpenClaw-Element Web LaTeX-MathJaX Render",
   "version": "1.6",
   "description": "Local LaTeX Renderer for Element",
   "permissions": ["scripting"],
