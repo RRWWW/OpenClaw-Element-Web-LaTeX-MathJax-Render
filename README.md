@@ -1,6 +1,6 @@
 # OpenClaw-Element Web LaTeX-MathJaX Render
 
-一個Chrome擴展，用於在Matrix.org Element Web & OpenClaw controlUI聊天中本地渲染LaTeX數學公式，使用MathJax。
+一個Chromium extension 擴展，用於在Matrix.org Element Web & OpenClaw controlUI聊天中本地渲染LaTeX數學公式，使用MathJax。
 
 ## 功能
 
@@ -74,5 +74,86 @@ MIT License
 歡迎提交問題和拉取請求！
 
 ## 版本
+
+v1.6
+
+---
+
+# OpenClaw-Element Web LaTeX-MathJaX Render (English)
+
+A Chrome extension for local LaTeX math rendering in Matrix.org Element Web & OpenClaw controlUI chat using MathJax.
+
+## Features
+
+- Local LaTeX formula rendering without external dependencies
+- Supports all MathJax features
+- Lightweight, no additional permissions required
+- Click SVG to copy formulas, etc.
+
+## Supported Browsers
+
+- Chrome
+- Edge
+- Lemur Browser
+- Chromium
+
+## Installation
+
+### Chrome
+
+1. Download or clone this repository
+2. Open Chrome browser, go to `chrome://extensions/`
+3. Enable "Developer mode"
+4. Click "Load unpacked", select this folder
+5. The extension will be installed and enabled
+
+### Edge
+
+1. Download or clone this repository
+2. Open Microsoft Edge browser, go to `edge://extensions/`
+3. Enable "Developer mode"
+4. Click "Load unpacked", select this folder
+5. The extension will be installed and enabled
+
+### Lemur Browser
+
+1. Download or clone this repository
+2. Open Lemur Browser, go to extensions management page
+3. Enable developer mode
+4. Load unpacked extension, select this folder
+5. The extension will be installed and enabled
+
+### Chromium
+
+1. Download or clone this repository
+2. Open Chromium browser, go to `chrome://extensions/`
+3. Enable "Developer mode"
+4. Click "Load unpacked", select this folder
+5. The extension will be installed and enabled
+
+## Usage
+
+After installation, the extension will automatically render LaTeX formulas in Element Web and OpenClaw controlUI. Use standard LaTeX syntax:
+
+- Inline formulas: `$...$`
+- Block formulas: `$$...$$`
+
+Click on the rendered SVG image to copy the LaTeX code.
+
+## Technical Details
+
+- Uses MathJax 4.x for rendering
+- Supports SVG output
+- Includes various extensions: ams, boldsymbol, color, enclose, etc.
+
+## License
+
+MIT License
+
+## Contributing
+
+Welcome to submit issues and pull requests!
+
+## Version
 
 v1.6
