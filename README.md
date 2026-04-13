@@ -9,7 +9,7 @@
   <sub>左：OpenClaw chat中的渲染</sub> &nbsp;&nbsp;|&nbsp;&nbsp; <sub>右：Element Web中的渲染</sub>
 </div>
 
-一個 Chromium extension 擴展，用於在Matrix.org Element Web & OpenClaw controlUI聊天中本地渲染LaTeX數學公式，使用MathJax。
+一個 Chromium extension 擴展，用於在Matrix.org Element Web、Telegram Web、OpenClaw controlUI 聊天及 Hermes agent 中本地渲染LaTeX數學公式，使用MathJax。
 
 ## 功能
 
@@ -23,6 +23,8 @@
 - [Matrix.org](https://matrix.org/) - 去中心化通訊協議
 - [Element Web](https://app.element.io/) - Matrix的Web客戶端
 - [OpenClaw](https://openclaw.org/) - OpenClaw controlUI聊天平台
+- [Telegram Web](https://web.telegram.org/) - Telegram Web版客戶端
+- [Hermes Agent](https://hermes-ai.org/) - Hermes AI Agent
 - [MathJax](https://www.mathjax.org/) - 數學公式渲染引擎
 
 ## 支持的瀏覽器
@@ -68,7 +70,7 @@
 
 ## 使用
 
-安裝後，擴展會自動在Element Web和OpenClaw controlUI中渲染LaTeX公式。使用標準LaTeX語法：
+安裝後，擴展會自動在Element Web、Telegram Web、OpenClaw controlUI 及 Hermes agent 中渲染LaTeX公式。使用標準LaTeX語法：
 
 - 行內公式：`$...$`
 - 區塊公式：`$$...$$`
@@ -96,7 +98,7 @@ v1.6
 
 # OpenClaw-Element Web LaTeX-MathJaX Render (English)
 
-A Chromium extension for local LaTeX math rendering in Matrix.org Element Web & OpenClaw controlUI chat using MathJax.
+A Chromium extension for local LaTeX math rendering in Matrix.org Element Web, Telegram Web, OpenClaw controlUI chat and Hermes agent using MathJax.
 
 ## Features
 
@@ -110,6 +112,8 @@ A Chromium extension for local LaTeX math rendering in Matrix.org Element Web & 
 - [Matrix.org](https://matrix.org/) - Decentralized communication protocol
 - [Element Web](https://app.element.io/) - Web client for Matrix
 - [OpenClaw](https://openclaw.org/) - OpenClaw controlUI chat platform
+- [Telegram Web](https://web.telegram.org/) - Telegram Web client
+- [Hermes Agent](https://hermes-ai.org/) - Hermes AI Agent
 - [MathJax](https://www.mathjax.org/) - Mathematical formula rendering engine
 
 ## Supported Browsers
@@ -155,7 +159,7 @@ A Chromium extension for local LaTeX math rendering in Matrix.org Element Web & 
 
 ## Usage
 
-After installation, the extension will automatically render LaTeX formulas in Element Web and OpenClaw controlUI. Use standard LaTeX syntax:
+After installation, the extension will automatically render LaTeX formulas in Element Web, Telegram Web, OpenClaw controlUI and Hermes agent. Use standard LaTeX syntax:
 
 - Inline formulas: `$...$`
 - Block formulas: `$$...$$`
