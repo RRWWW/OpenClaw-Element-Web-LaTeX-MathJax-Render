@@ -672,6 +672,10 @@ function boot() {
                     if (p.classList && p.classList.contains('latex-rendered')) {
                         return NodeFilter.FILTER_REJECT;
                     }
+                    // ★ 跳過 code/pre 內的文字（$ 在程式碼中不需渲染，避免無限重試迴圈）
+                    if (p.tagName === 'CODE' || p.tagName === 'PRE') {
+                        return NodeFilter.FILTER_REJECT;
+                    }
                     p = p.parentElement;
                 }
                 return NodeFilter.FILTER_ACCEPT;
@@ -683,7 +687,7 @@ function boot() {
             text += node.textContent;
             if (text.length > 4000) break;  // 早退避免大訊息浪費
         }
-        return /\$|\\\(|\\\[|\\begin\{[a-zA-Z]/.test(text);
+        return /\$|\\\(|\\\[|\\begin\{(equation|align|aligned|array|matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|smallmatrix|cases|gather|gathered|split|multline|eqnarray|CD|math|displaymath)\*?\}/.test(text);
     }
 
     // ★ 把已渲染的 .latex-rendered / .latex-md-table 還原成原始文字
@@ -722,23 +726,32 @@ function boot() {
         }
 
         // ★ Telegram 把 $...$ 誤判成 cashtag（股票代號），包成藍色超連結 <a>
-        // 解包成普通 span，讓 LaTeX 以白底黑字正常顯示
-        const tgEntities = el.querySelectorAll(
-            'a.text-entity-link[data-entity-type="MessageEntityCashtag"],' +
+        // Cashtag：Telegram 消耗了 $ 符號（$F → <a>F</a>），必須還原，
+        //          否則 $F = ma$ 的配對會斷掉，LaTeX 無法識別
+        // Hashtag：直接解包成 span 即可
+        el.querySelectorAll(
+            'a.text-entity-link[data-entity-type="MessageEntityCashtag"]'
+        ).forEach(a => {
+            const inner = a.textContent;
+            // 若 Telegram 已把 $ 放進 link text 則不重複加；否則補上 $
+            const restored = inner.startsWith('$') ? inner : '$' + inner;
+            a.replaceWith(document.createTextNode(restored));
+        });
+        el.querySelectorAll(
             'a.text-entity-link[data-entity-type="MessageEntityHashtag"]'
-        );
-        for (const a of tgEntities) {
+        ).forEach(a => {
             const span = document.createElement('span');
             while (a.firstChild) span.appendChild(a.firstChild);
             a.replaceWith(span);
-        }
+        });
 
         const text = el.textContent;
         const hasDisplay = text.includes('$$');
         const hasInline = /\$[^$]/.test(text);
         const hasLatexDelim = text.includes('\\(') || text.includes('\\[');
         // ★ 新增：偵測裸露的 \begin{...} 環境（無 $$ 包裹）
-        const hasBareEnv = /\\begin\{/.test(text);
+        // 只偵測 MathJax 支援的數學環境，排除文件模式環境（table, figure, tikzpicture 等）
+        const hasBareEnv = /\\begin\{(equation|align|aligned|array|matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|smallmatrix|cases|gather|gathered|split|multline|eqnarray|CD|math|displaymath)[*]?\}/.test(text);
         if (!hasDisplay && !hasInline && !hasLatexDelim && !hasBareEnv) return;
 
         let html = el.innerHTML;
@@ -787,11 +800,14 @@ function boot() {
         });
 
         // ★ 新增：偵測裸露的 \begin{env}...\end{env}（無 $$ 包裹），視為 display math
-        // 支援常見環境：array, matrix, pmatrix, bmatrix, Bmatrix, vmatrix, Vmatrix,
-        //              aligned, align, cases, equation, gather, split, etc.
+        // 只處理 MathJax 支援的數學環境，排除文件模式環境（table, figure, tikzpicture 等）
+        // 以免 \begin{table} 造成無限重試迴圈
+        const MATH_ENV_RE = /^(equation|align|aligned|array|matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|smallmatrix|cases|gather|gathered|split|multline|eqnarray|CD|math|displaymath)\*?$/;
         html = html.replace(/\\begin\{([a-zA-Z*]+)\}([\s\S]*?)\\end\{\1\}/g, (full, env, inner) => {
             // 如果已經在 SLOT 裡（已處理），跳過
             if (full.includes('\x00SLOT')) return full;
+            // 只處理數學環境
+            if (!MATH_ENV_RE.test(env)) return full;
             const tex = stripTags(full).trim();
             if (!tex) return full;
             const result = wrapSvg(tex, true);
@@ -827,7 +843,12 @@ function boot() {
         // ── Markdown 表格渲染（LaTeX 已先渲染，格子內含 SLOT ref）───────────────
         if (html.includes('|')) {
             // 統一換行：<br> → \n，方便逐行偵測
-            const normHtml = html.replace(/<br\s*\/?>/gi, '\n');
+            // ★ 修復：若表格標題嵌在前段文字同一行末（如 "說明,,| 標題 | 欄 |"），
+            //         在 | 前插入換行，使偵測器能正確識別 header
+            const normHtml = html
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/([^\n|])(\|(?:[^|\n]+\|){2,})(?=\n\|[\s\-:|]+\|)/g,
+                         (_, lastChar, header) => lastChar + '\n' + header);
             const lines = normHtml.split('\n');
             const out = [];
             let tLines = []; // { raw, text } — raw 含 HTML，text 去 tag 後用來解析
@@ -885,27 +906,23 @@ function boot() {
 
         // ── 還原所有佔位符 ──
         if (changed) el.innerHTML = restore(html);
+
+        // ★ 記錄渲染後的內容指紋（textContent 長度）
+        //   scan() 用此來判斷是否有新內容到達，避免解析失敗的元素被無限重試。
+        processedLen.set(el, el.textContent.length);
     }
 
-    // ── 可見性驅動的渲染：只渲染視窗內的訊息，避免阻塞 ──
+    // ── 渲染佇列（直接排隊，不依賴 IntersectionObserver）────────────────────
+    // ★ 修復：IntersectionObserver 的 rootMargin 無法穿透 Discord 等平台的
+    //         overflow:hidden 捲動容器，導致視窗外的訊息永遠不觸發 isIntersecting。
+    //         改用直接排隊 + requestIdleCallback 節流，效能同樣良好。
     let rendering = false;
     const renderQueue = [];
+    // ★ 內容指紋：記錄每個元素上次 renderEl 完成後的 textContent 長度
+    //   scan() 只有在長度變化（新內容到達）時才重新排隊，防止解析失敗（如 \xrightarrow 無法渲染）
+    //   造成的無限重試迴圈。
+    const processedLen = new WeakMap();
     let renderTimer = null;
-
-    // IntersectionObserver：元素進入視窗附近時才加入渲染佇列
-    const visObs = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-            if (entry.isIntersecting && !processed.has(entry.target)) {
-                visObs.unobserve(entry.target);
-                if (!renderQueue.includes(entry.target)) {
-                    renderQueue.push(entry.target);
-                }
-            }
-        }
-        if (renderQueue.length && !renderTimer) {
-            renderTimer = requestAnimationFrame(flushRender);
-        }
-    }, { rootMargin: '99999px 0px' });
 
     function flushRender() {
         renderTimer = null;
@@ -947,19 +964,33 @@ function boot() {
         return PLATFORM_SELECTORS.map(p => p.msg).join(', ');
     }
 
-    // 掃描：找到未處理的訊息，交給 IntersectionObserver
+    // 掃描：找到未處理的訊息，直接放入渲染佇列
     // ★ Telegram 等漸進載入平台：若元素含有未渲染的 LaTeX 則重設狀態重新處理
+    function enqueue(el) {
+        if (!renderQueue.includes(el)) renderQueue.push(el);
+    }
     function scan() {
         for (const el of document.querySelectorAll(getMsgSelector())) {
             if (processed.has(el)) {
+                // ★ 已渲染表格的元素不重新處理：
+                //   unwrapRendered 會移除 <table> 但無法還原原本的 pipe 文字，
+                //   導致表格永久消失。若表格存在，視為完整渲染，不重新排隊。
+                if (el.querySelector('.latex-md-table')) continue;
+                // ★ 內容指紋檢查：若 textContent 長度沒有變化，表示沒有新內容到達，
+                //   無需重試（避免解析失敗的元素如 \xrightarrow、\begin{table} 造成無限迴圈）
+                const lastLen = processedLen.get(el);
+                if (lastLen !== undefined && lastLen === el.textContent.length) continue;
                 // 已處理過，但內容可能更新了 → 檢查是否還有未渲染的 LaTeX
                 if (hasUnrenderedLatex(el)) {
                     processed.delete(el);
-                    visObs.observe(el);
+                    enqueue(el);
                 }
             } else {
-                visObs.observe(el);
+                enqueue(el);
             }
+        }
+        if (renderQueue.length && !renderTimer) {
+            renderTimer = requestAnimationFrame(flushRender);
         }
     }
 
@@ -970,17 +1001,17 @@ function boot() {
         clearTimeout(timer);
         timer = setTimeout(scan, 200);
     });
-    let currentList = null;
+    const observedLists = new Set();
 
     function attachListObserver() {
         for (const { list } of PLATFORM_SELECTORS) {
-            const el = document.querySelector(list);
-            if (el && el !== currentList) {
-                if (currentList) msgObs.disconnect();
-                currentList = el;
-                msgObs.observe(el, { childList: true, subtree: true });
-                console.log('[LaTeX] Attached observer to', list);
-                return;
+            // ★ 觀察所有匹配的列表（例如 Discord 同時有主頻道 + 討論串面板）
+            for (const el of document.querySelectorAll(list)) {
+                if (!observedLists.has(el)) {
+                    observedLists.add(el);
+                    msgObs.observe(el, { childList: true, subtree: true });
+                    console.log('[LaTeX] Attached observer to', list);
+                }
             }
         }
     }
