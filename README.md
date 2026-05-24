@@ -9,7 +9,7 @@
   <sub>左：OpenClaw chat中的渲染</sub> &nbsp;&nbsp;|&nbsp;&nbsp; <sub>右：Element Web中的渲染</sub>
 </div>
 
-一個 Chromium extension 擴展，用於在Matrix.org Element Web、Telegram Web、OpenClaw controlUI 聊天及 Hermes agent 中本地渲染LaTeX數學公式，使用MathJax。
+一個 Chromium extension 擴展，用於在Matrix.org Element Web、Telegram Web、OpenClaw controlUI 聊天、Discord 及 Hermes agent 中本地渲染LaTeX數學公式，使用MathJax。
 
 ## 功能
 
@@ -17,6 +17,7 @@
 - 支持MathJax的所有功能
 - 輕量級，無需額外權限
 - 點選SVG可複製公式等
+- 支持 Markdown 表格渲染（格子內可含 LaTeX）
 
 ## 相關鏈接
 
@@ -24,6 +25,7 @@
 - [Element Web](https://app.element.io/) - Matrix的Web客戶端
 - [OpenClaw](https://openclaw.org/) - OpenClaw controlUI聊天平台
 - [Telegram Web](https://web.telegram.org/) - Telegram Web版客戶端
+- [Discord](https://discord.com/) - Discord Web版
 - [Hermes Agent](https://hermes-ai.org/) - Hermes AI Agent
 - [MathJax](https://www.mathjax.org/) - 數學公式渲染引擎
 
@@ -70,7 +72,7 @@
 
 ## 使用
 
-安裝後，擴展會自動在Element Web、Telegram Web、OpenClaw controlUI 及 Hermes agent 中渲染LaTeX公式。使用標準LaTeX語法：
+安裝後，擴展會自動在Element Web、Telegram Web、OpenClaw controlUI、Discord 及 Hermes agent 中渲染LaTeX公式。使用標準LaTeX語法：
 
 - 行內公式：`$...$`
 - 區塊公式：`$$...$$`
@@ -92,13 +94,13 @@ MIT License
 
 ## 版本
 
-v1.6
+v1.9.0
 
 ---
 
 # OpenClaw-Element Web LaTeX-MathJaX Render (English)
 
-A Chromium extension for local LaTeX math rendering in Matrix.org Element Web, Telegram Web, OpenClaw controlUI chat and Hermes agent using MathJax.
+A Chromium extension for local LaTeX math rendering in Matrix.org Element Web, Telegram Web, OpenClaw controlUI chat, Discord and Hermes agent using MathJax.
 
 ## Features
 
@@ -106,6 +108,7 @@ A Chromium extension for local LaTeX math rendering in Matrix.org Element Web, T
 - Supports all MathJax features
 - Lightweight, no additional permissions required
 - Click SVG to copy formulas, etc.
+- Markdown table rendering with LaTeX support in cells
 
 ## Related Links
 
@@ -113,6 +116,7 @@ A Chromium extension for local LaTeX math rendering in Matrix.org Element Web, T
 - [Element Web](https://app.element.io/) - Web client for Matrix
 - [OpenClaw](https://openclaw.org/) - OpenClaw controlUI chat platform
 - [Telegram Web](https://web.telegram.org/) - Telegram Web client
+- [Discord](https://discord.com/) - Discord Web
 - [Hermes Agent](https://hermes-ai.org/) - Hermes AI Agent
 - [MathJax](https://www.mathjax.org/) - Mathematical formula rendering engine
 
@@ -159,7 +163,7 @@ A Chromium extension for local LaTeX math rendering in Matrix.org Element Web, T
 
 ## Usage
 
-After installation, the extension will automatically render LaTeX formulas in Element Web, Telegram Web, OpenClaw controlUI and Hermes agent. Use standard LaTeX syntax:
+After installation, the extension will automatically render LaTeX formulas in Element Web, Telegram Web, OpenClaw controlUI, Discord and Hermes agent. Use standard LaTeX syntax:
 
 - Inline formulas: `$...$`
 - Block formulas: `$$...$$`
@@ -185,4 +189,4 @@ Welcome to submit issues and pull requests!
 
 ## Version
 
-v1.6
+v1.9.0
