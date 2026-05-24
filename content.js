@@ -298,6 +298,27 @@ window.MathJax = {
             -webkit-user-select: text;
         }
         .latex-rendered .latex-src::selection { background: rgba(0,120,215,.3); }
+        /* Markdown 表格 */
+        .latex-md-table {
+            border-collapse: collapse;
+            margin: 6px 0;
+            color: inherit;
+            font-size: inherit;
+        }
+        .latex-md-table th, .latex-md-table td {
+            border: 1px solid rgba(255,255,255,0.18);
+            padding: 3px 12px;
+            text-align: left;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        .latex-md-table th {
+            background: rgba(255,255,255,0.07);
+            font-weight: 600;
+        }
+        .latex-md-table tr:nth-child(even) td {
+            background: rgba(255,255,255,0.03);
+        }
         /* 全域提示：由 JS 動態定位，position:fixed 不受父層 overflow 裁剪 */
         #latex-tip-global {
             position: fixed; z-index: 2147483647; pointer-events: none;
@@ -800,6 +821,51 @@ function boot() {
             return full;
         });
 
+        // ── Markdown 表格渲染（LaTeX 已先渲染，格子內含 SLOT ref）───────────────
+        if (html.includes('|')) {
+            // 統一換行：<br> → \n，方便逐行偵測
+            const normHtml = html.replace(/<br\s*\/?>/gi, '\n');
+            const lines = normHtml.split('\n');
+            const out = [];
+            let tLines = [];
+
+            const flushTable = () => {
+                // 需 ≥2 行，且第二行為分隔線 |---|---|
+                if (tLines.length >= 2 && /^\s*\|[\s\-:|]+\|\s*$/.test(tLines[1])) {
+                    const rows = tLines.map(l => l.trim()).filter(l => /^\|.+\|$/.test(l));
+                    if (rows.length >= 2) {
+                        const parse = l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+                        const heads = parse(rows[0]);
+                        const body  = rows.slice(2).filter(Boolean).map(parse);
+                        let t = '<table class="latex-md-table"><thead><tr>';
+                        heads.forEach(h => t += `<th>${h}</th>`);
+                        t += '</tr></thead><tbody>';
+                        body.forEach(cells => {
+                            t += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
+                        });
+                        t += '</tbody></table>';
+                        out.push(t);
+                        changed = true;
+                        tLines = [];
+                        return;
+                    }
+                }
+                out.push(...tLines);
+                tLines = [];
+            };
+
+            for (const line of lines) {
+                if (/^\s*\|.+\|\s*$/.test(line)) {
+                    tLines.push(line);
+                } else {
+                    if (tLines.length) flushTable();
+                    out.push(line);
+                }
+            }
+            if (tLines.length) flushTable();
+            html = out.join('\n');
+        }
+
         // ── 還原所有佔位符 ──
         if (changed) el.innerHTML = restore(html);
     }
@@ -854,9 +920,10 @@ function boot() {
     // 各平台的選擇器設定
     // msg: 訊息文字容器，list: 訊息列表（用來觀察新訊息）
     const PLATFORM_SELECTORS = [
-        { msg: '.mx_EventTile_body',  list: '.mx_RoomView_MessageList' }, // Element
-        { msg: '.chat-text',          list: '.chat-thread-inner' },        // OpenClaw
-        { msg: '.text-content',       list: '.MessageList' },               // Telegram Web A
+        { msg: '.mx_EventTile_body',          list: '.mx_RoomView_MessageList' }, // Element
+        { msg: '.chat-text',                  list: '.chat-thread-inner' },        // OpenClaw
+        { msg: '.text-content',               list: '.MessageList' },               // Telegram Web A
+        { msg: '[class*="messageContent"]',   list: 'ol[class*="scrollerInner"]' }, // Discord
     ];
 
     function getMsgSelector() {
