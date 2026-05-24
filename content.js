@@ -686,9 +686,12 @@ function boot() {
         return /\$|\\\(|\\\[|\\begin\{[a-zA-Z]/.test(text);
     }
 
-    // ★ 把已渲染的 .latex-rendered 還原成原始 $...$ 文字
+    // ★ 把已渲染的 .latex-rendered / .latex-md-table 還原成原始文字
     // 內容變動後需要乾淨重新處理時使用。
     function unwrapRendered(el) {
+        // 移除已渲染的 Markdown 表格（無法還原 markdown 原文，直接移除讓重新渲染）
+        el.querySelectorAll('.latex-md-table').forEach(t => t.remove());
+        // 還原 LaTeX span → 原始 $...$ 文字
         const rendered = el.querySelectorAll('.latex-rendered');
         for (const r of rendered) {
             const tex = r.getAttribute('data-latex') || '';
@@ -827,36 +830,50 @@ function boot() {
             const normHtml = html.replace(/<br\s*\/?>/gi, '\n');
             const lines = normHtml.split('\n');
             const out = [];
-            let tLines = [];
+            let tLines = []; // { raw, text } — raw 含 HTML，text 去 tag 後用來解析
+
+            // 去除行內 HTML tag，取純文字，用於判斷 & 解析表格
+            const stripH = s => s.replace(/<[^>]+>/g, '').trim();
 
             const flushTable = () => {
-                // 需 ≥2 行，且第二行為分隔線 |---|---|
-                if (tLines.length >= 2 && /^\s*\|[\s\-:|]+\|\s*$/.test(tLines[1])) {
-                    const rows = tLines.map(l => l.trim()).filter(l => /^\|.+\|$/.test(l));
-                    if (rows.length >= 2) {
-                        const parse = l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-                        const heads = parse(rows[0]);
-                        const body  = rows.slice(2).filter(Boolean).map(parse);
-                        let t = '<table class="latex-md-table"><thead><tr>';
-                        heads.forEach(h => t += `<th>${h}</th>`);
-                        t += '</tr></thead><tbody>';
-                        body.forEach(cells => {
-                            t += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
-                        });
-                        t += '</tbody></table>';
-                        out.push(t);
-                        changed = true;
-                        tLines = [];
-                        return;
+                if (tLines.length >= 2) {
+                    const texts = tLines.map(o => o.text);
+                    // 第二行必須是分隔線 |---|---| 或 |:---:|
+                    if (/^\|[\s\-:|]+\|$/.test(texts[1])) {
+                        const validTexts = texts.filter(t => /^\|.+\|$/.test(t));
+                        if (validTexts.length >= 2) {
+                            const parse = l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+                            const heads = parse(validTexts[0]);
+                            const body  = validTexts.slice(2).filter(Boolean).map(parse);
+
+                            // 保留首行開頭的 HTML tag（如 <span>）及末行尾部的 HTML tag（如 </span>）
+                            const prefix = tLines[0].raw.match(/^((?:<[^>]*>)*)/)?.[1] || '';
+                            const suffix = tLines[tLines.length - 1].raw.match(/((?:<\/[^>]*>)*)$/)?.[1] || '';
+
+                            let t = '<table class="latex-md-table"><thead><tr>';
+                            heads.forEach(h => t += `<th>${h}</th>`);
+                            t += '</tr></thead><tbody>';
+                            body.forEach(cells => {
+                                t += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
+                            });
+                            t += '</tbody></table>';
+
+                            out.push(prefix + t + suffix);
+                            changed = true;
+                            tLines = [];
+                            return;
+                        }
                     }
                 }
-                out.push(...tLines);
+                out.push(...tLines.map(o => o.raw));
                 tLines = [];
             };
 
             for (const line of lines) {
-                if (/^\s*\|.+\|\s*$/.test(line)) {
-                    tLines.push(line);
+                // 去除 HTML tag 後，判斷是否為 |...|...| 格式的表格行
+                const text = stripH(line);
+                if (/^\|.+\|\s*$/.test(text)) {
+                    tLines.push({ raw: line, text });
                 } else {
                     if (tLines.length) flushTable();
                     out.push(line);
