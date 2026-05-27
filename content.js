@@ -298,6 +298,18 @@ window.MathJax = {
             -webkit-user-select: text;
         }
         .latex-rendered .latex-src::selection { background: rgba(0,120,215,.3); }
+        /* ★ Discord overlay：原 messageContent 由 React 管理，
+           我們改 innerHTML 會讓 React reconciliation 撞孤兒節點導致整頁崩潰
+           ("Well, this is awkward")。改在尾端 append 一個 overlay div，
+           並用 CSS 把其他兄弟隱藏，React 完全不會被打擾。 */
+        [data-latex-discord-rendered] > *:not(.latex-discord-overlay) {
+            display: none !important;
+        }
+        .latex-discord-overlay {
+            display: block;
+            color: inherit;
+            font: inherit;
+        }
         /* Markdown 表格 */
         .latex-md-table {
             border-collapse: collapse;
@@ -665,6 +677,9 @@ function boot() {
     // 用於 Telegram 等漸進載入內容的平台：訊息容器在內容到達前可能先被觀察過，
     // 等實際 LaTeX 出現時必須能重新處理。
     function hasUnrenderedLatex(el) {
+        // ★ Discord overlay 模式：原文兄弟仍含 $$/$ 文字但已被 CSS 隱藏，
+        //   且由 overlay 重新渲染；TreeWalker 必須跳過這些原文，否則無限重試。
+        const discordOverlayed = el.hasAttribute && el.hasAttribute('data-latex-discord-rendered');
         const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
             acceptNode(n) {
                 let p = n.parentElement;
@@ -674,6 +689,11 @@ function boot() {
                     }
                     // ★ 跳過 code/pre 內的文字（$ 在程式碼中不需渲染，避免無限重試迴圈）
                     if (p.tagName === 'CODE' || p.tagName === 'PRE') {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    // ★ Discord overlay：頂層非 overlay 子節點整支跳過
+                    if (discordOverlayed && p.parentElement === el
+                        && !(p.classList && p.classList.contains('latex-discord-overlay'))) {
                         return NodeFilter.FILTER_REJECT;
                     }
                     p = p.parentElement;
@@ -688,6 +708,14 @@ function boot() {
             if (text.length > 4000) break;  // 早退避免大訊息浪費
         }
         return /\$|\\\(|\\\[|\\begin\{(equation|align|aligned|array|matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|smallmatrix|cases|gather|gathered|split|multline|eqnarray|CD|math|displaymath)\*?\}/.test(text);
+    }
+
+    // ★ Discord 用 React 管控 messageContent，innerHTML 替換會讓 React fiber
+    //   持有的子節點變孤兒，下次 reconciliation 撞上即崩潰（"Well, this is awkward"）。
+    //   改在 messageContent 內 append 一個 overlay 子節點，並用 CSS 隱藏其他兄弟。
+    //   React 只管自己創的子節點，append 的 overlay 不會被它主動移除。
+    function isDiscordMsg(el) {
+        return el && el.matches && el.matches('[class*="messageContent"]');
     }
 
     // ★ 把已渲染的 .latex-rendered / .latex-md-table 還原成原始文字
@@ -719,9 +747,15 @@ function boot() {
             if (preLen > el.textContent.length * 0.9) return;
         }
 
+        const discordMode = isDiscordMsg(el);
+
         // ★ 若元素已有舊渲染，先還原為原始文字以便重新處理
         // （Telegram 漸進載入：第一次處理時可能 LaTeX 還沒到，需要支援重做）
-        if (el.querySelector('.latex-rendered')) {
+        // Discord overlay 模式：不還原原文（會動到 React 子樹），只清除舊 overlay 即可。
+        if (discordMode) {
+            el.querySelectorAll(':scope > .latex-discord-overlay').forEach(o => o.remove());
+            el.removeAttribute('data-latex-discord-rendered');
+        } else if (el.querySelector('.latex-rendered')) {
             unwrapRendered(el);
         }
 
@@ -752,7 +786,10 @@ function boot() {
         // ★ 新增：偵測裸露的 \begin{...} 環境（無 $$ 包裹）
         // 只偵測 MathJax 支援的數學環境，排除文件模式環境（table, figure, tikzpicture 等）
         const hasBareEnv = /\\begin\{(equation|align|aligned|array|matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|smallmatrix|cases|gather|gathered|split|multline|eqnarray|CD|math|displaymath)[*]?\}/.test(text);
-        if (!hasDisplay && !hasInline && !hasLatexDelim && !hasBareEnv) return;
+        // ★ 新增：偵測純 Markdown table（標頭行 + 分隔行）
+        // 不偵測會漏掉「整段表格、無 LaTeX」的訊息
+        const hasMdTable = /\|[^\n]*\|[\r\n]+[\s]*\|[\s\-:|]+\|/.test(text);
+        if (!hasDisplay && !hasInline && !hasLatexDelim && !hasBareEnv && !hasMdTable) return;
 
         let html = el.innerHTML;
         let changed = false;
@@ -845,10 +882,12 @@ function boot() {
             // 統一換行：<br> → \n，方便逐行偵測
             // ★ 修復：若表格標題嵌在前段文字同一行末（如 "說明,,| 標題 | 欄 |"），
             //         在 | 前插入換行，使偵測器能正確識別 header
+            //   注意：必須限定「同一行從行首到 | 之間沒有任何 pipe」，
+            //   否則正常的 "| a | b | c |" 表頭會在中間被切斷。
             const normHtml = html
                 .replace(/<br\s*\/?>/gi, '\n')
-                .replace(/([^\n|])(\|(?:[^|\n]+\|){2,})(?=\n\|[\s\-:|]+\|)/g,
-                         (_, lastChar, header) => lastChar + '\n' + header);
+                .replace(/(^|\n)([^\n|]+?)(\|(?:[^|\n]+\|){2,})(?=\n\|[\s\-:|]+\|)/g,
+                         (_, nl, prefix, header) => nl + prefix + '\n' + header);
             const lines = normHtml.split('\n');
             const out = [];
             let tLines = []; // { raw, text } — raw 含 HTML，text 去 tag 後用來解析
@@ -863,7 +902,12 @@ function boot() {
                     if (/^\|[\s\-:|]+\|$/.test(texts[1])) {
                         const validTexts = texts.filter(t => /^\|.+\|$/.test(t));
                         if (validTexts.length >= 2) {
-                            const parse = l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+                            // ★ 支援 cell 內以 \| 跳脫的 pipe（GFM 慣例）
+                            //   先用 placeholder 換掉 \|，split 後再還原
+                            const parse = l => l.replace(/^\||\|$/g, '')
+                                .replace(/\\\|/g, '\x01')
+                                .split('|')
+                                .map(c => c.trim().replace(/\x01/g, '|'));
                             const heads = parse(validTexts[0]);
                             const body  = validTexts.slice(2).filter(Boolean).map(parse);
 
@@ -905,7 +949,18 @@ function boot() {
         }
 
         // ── 還原所有佔位符 ──
-        if (changed) el.innerHTML = restore(html);
+        if (changed) {
+            if (discordMode) {
+                // Discord：不動 React 管控的子節點，只在尾端 append overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'latex-discord-overlay';
+                overlay.innerHTML = restore(html);
+                el.appendChild(overlay);
+                el.setAttribute('data-latex-discord-rendered', '1');
+            } else {
+                el.innerHTML = restore(html);
+            }
+        }
 
         // ★ 記錄渲染後的內容指紋（textContent 長度）
         //   scan() 用此來判斷是否有新內容到達，避免解析失敗的元素被無限重試。
@@ -972,6 +1027,16 @@ function boot() {
     function scan() {
         for (const el of document.querySelectorAll(getMsgSelector())) {
             if (processed.has(el)) {
+                // ★ Discord：如果 overlay 屬性還在但 overlay 子節點被外部（React）移掉，
+                //   表示渲染被破壞，要重做。重置 attr + processed 後再判斷。
+                if (el.hasAttribute('data-latex-discord-rendered')
+                    && !el.querySelector(':scope > .latex-discord-overlay')) {
+                    el.removeAttribute('data-latex-discord-rendered');
+                    processed.delete(el);
+                    processedLen.delete(el);
+                    enqueue(el);
+                    continue;
+                }
                 // ★ 已渲染表格的元素不重新處理：
                 //   unwrapRendered 會移除 <table> 但無法還原原本的 pipe 文字，
                 //   導致表格永久消失。若表格存在，視為完整渲染，不重新排隊。
