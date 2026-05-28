@@ -868,13 +868,22 @@ function boot() {
             //   - ,   ：逗號列表極常見 → 只在 微分(\,d?) 或 緊貼 \color 群組 時還原，
             //           其餘逗號(如 (\alpha,\beta)、f(x,y)) 一律保留。
             const SP = { ';': '\\;', ':': '\\:' };
-            const recoverSpacing = t => t
-                .replace(/(?<!\\)([;:])(?=\s|\\|[+\-=<>)\]}])/g, m => SP[m])
-                .replace(/(?<=[+\-=<>(\[{])(?<!\\)([;:])/g, m => SP[m])
-                .replace(/!(?=\\[a-zA-Z])/g, '\\!')
-                .replace(/(\}|\w)\s*,\s*(d[a-zA-Z])/g, '$1\\,$2')
-                .replace(/,(?=\s*\\color)/g, '\\,')
-                .replace(/([+\-=<>])\s*,/g, '$1\\,');   // 逗號緊跟二元運算子後(如 -\,)：真清單不會這樣寫，安全
+            const recoverSpacing = t => {
+                // ★ 先保護 HTML 標籤與實體，避免把它們的 ; 或 < > 當成 LaTeX 標點誤改：
+                //   對齊符 & 在 innerHTML 裡是 &amp;，若不保護，"&amp;=" 的 ; 會被當成 \;
+                //   還原成 "&amp\;" → 解碼失敗 → \begin{align} 整個爆掉。
+                const prot = [];
+                t = t.replace(/<[^>]+>|&[a-zA-Z]+;|&#\d+;/g,
+                              m => { prot.push(m); return '\x02' + (prot.length - 1) + '\x02'; });
+                t = t
+                    .replace(/(?<!\\)([;:])(?=\s|\\|[+\-=<>)\]}])/g, m => SP[m])
+                    .replace(/(?<=[+\-=<>(\[{])(?<!\\)([;:])/g, m => SP[m])
+                    .replace(/!(?=\\[a-zA-Z])/g, '\\!')
+                    .replace(/(\}|\w)\s*,\s*(d[a-zA-Z])/g, '$1\\,$2')
+                    .replace(/,(?=\s*\\color)/g, '\\,')
+                    .replace(/([+\-=<>])\s*,/g, '$1\\,');   // 逗號緊跟二元運算子後(如 -\,)：真清單不會這樣寫，安全
+                return t.replace(/\x02(\d+)\x02/g, (_, i) => prot[+i]);
+            };
             html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, inner) => '$$' + recoverSpacing(inner) + '$$');
             html = html.replace(/(?<!\$)\$(?!\$)([\s\S]{1,500}?)(?<!\$)\$(?!\$)/g,
                                 (m, inner) => '$' + recoverSpacing(inner) + '$');
