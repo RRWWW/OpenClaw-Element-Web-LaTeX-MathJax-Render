@@ -879,9 +879,11 @@ function boot() {
                     .replace(/(?<!\\)([;:])(?=\s|\\|[+\-=<>)\]}])/g, m => SP[m])
                     .replace(/(?<=[+\-=<>(\[{])(?<!\\)([;:])/g, m => SP[m])
                     .replace(/!(?=\\[a-zA-Z])/g, '\\!')
-                    .replace(/(\}|\w)\s*,\s*(d[a-zA-Z])/g, '$1\\,$2')
-                    .replace(/,(?=\s*\\color)/g, '\\,')
-                    .replace(/([+\-=<>])\s*,/g, '$1\\,');   // 逗號緊跟二元運算子後(如 -\,)：真清單不會這樣寫，安全
+                    .replace(/([\w}\)\]])\s*,\s*(d[a-zA-Z])/g, '$1\\,$2')   // 微分間距 \,dx：前綴允許 文字/}/)/]（如 f(z)\,dz、[g]\,dx）
+                    .replace(/,(?=\\(?:text)?color)/g, '\\,')   // 緊貼(無空格) \color/\textcolor 的逗號 = 群組間被吃的 \,（有空格的真清單則保留）
+                    .replace(/([+\-=<>])\s*,/g, '$1\\,')          // 逗號緊跟二元運算子後(如 -\,)：真清單不會這樣寫，安全
+                    .replace(/(\\(?:exists|forall|nexists))\s*,/g, '$1\\,')  // 量詞後的逗號：\exists\, 被吃成 \exists ,（量詞後絕不接真逗號）
+                    .replace(/(,\s+),/g, '$1\\,');                // 雙逗號的第二個 = 被吃的 \,（如 "0, , n_0" → "0, \, n_0"）
                 return t.replace(/\x02(\d+)\x02/g, (_, i) => prot[+i]);
             };
             html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, inner) => '$$' + recoverSpacing(inner) + '$$');

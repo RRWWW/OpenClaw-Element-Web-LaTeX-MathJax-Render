@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LaTeX render",
-  "version": "1.10.8",
+  "version": "1.10.9",
   "description": "Local LaTeX Renderer for Element, Telegram, OpenClaw, Discord",
   "permissions": [
     "scripting",
