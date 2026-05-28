@@ -131,64 +131,109 @@ window.MathJax = {
 
             MathJax.startup.defaultReady();
 
-            // ★ 重新執行擴充：loader.ready() 階段 MathJax._ 命名空間尚未完整
-            //   combineWithMathJax 寫入失敗；此處再呼叫一次確保 Configuration 與 CommandMap 註冊
-            try {
-                if (window.mj_ext_enclose) window.mj_ext_enclose();
-                if (window.mj_ext_cancel) window.mj_ext_cancel();
-                if (window.mj_ext_boldsymbol) window.mj_ext_boldsymbol();
-                if (window.mj_ext_bbox) window.mj_ext_bbox();
-                if (window.mj_ext_color) window.mj_ext_color();
-                console.log('[LaTeX] Re-executed extensions post-startup');
-            } catch (e) { console.warn('[LaTeX] Re-exec error:', e); }
-
-            // ★ 後備注入：確保 extension CommandMap 存在於 parser 的 macro handler
-            try {
-                var _inp = MathJax.startup.input;
-                if (Array.isArray(_inp)) _inp = _inp[0];
-                var _macroH = _inp.parseOptions.handlers.get('macro');
-                var _items = _macroH._configuration.items;
-                var _mhGet = MathJax._.input.tex.MapHandler.MapHandler;
-                ['enclose', 'cancel', 'boldsymbol', 'bbox', 'color'].forEach(function (name) {
-                    var exists = _items.some(function (i) {
-                        return (i.item?._name || i.item?.name) === name;
-                    });
-                    if (exists) return;
-                    var map = null;
-                    try { map = _mhGet.getMap(name); } catch (_) { }
-                    if (!map && window._capturedExtMaps) map = window._capturedExtMaps[name];
-                    if (map) {
-                        _items.push({ item: map, priority: 5 });
-                        console.log('[LaTeX] Injected', name, 'map into parser');
-                    } else {
-                        console.warn('[LaTeX] Map not found:', name);
+            // ★ 重新執行擴充並注入 maps：提取為可重入函式，loader.ready 與 boot() 都會呼叫
+            //   - 順序：enclose 必須在 cancel 之前（cancel 依賴 enclose 的 ENCLOSE_OPTIONS）
+            //   - 每個擴充包獨立 try/catch，避免單一失敗連帶讓後續擴充不被執行
+            //   - 已註冊則跳過，反覆呼叫是冪等的
+            window._latexLoadExtensions = function () {
+                var EXTS = ['enclose', 'cancel', 'boldsymbol', 'bbox', 'color'];
+                var loaded = 0;
+                for (var i = 0; i < EXTS.length; i++) {
+                    var name = EXTS[i];
+                    // 已註冊就跳過
+                    if (MathJax._ && MathJax._.input && MathJax._.input.tex && MathJax._.input.tex[name]) {
+                        loaded++;
+                        continue;
                     }
-                });
-            } catch (e) { console.warn('[LaTeX] Map injection error:', e); }
-
-            // ★ color extension 需要初始化 ColorModel
-            try {
-                var _inp3 = MathJax.startup.input;
-                if (Array.isArray(_inp3)) _inp3 = _inp3[0];
-                var _pd = _inp3.parseOptions.packageData;
-                if (_pd && !_pd.get('color')) {
-                    var _colorMod = MathJax._.input.tex.color;
-                    if (_colorMod) {
-                        // 嘗試取得 ColorModel class
-                        var ColorModel = _colorMod.ColorUtil?.ColorModel
-                                      || _colorMod.ColorUtil?.ColorModel;
-                        if (ColorModel) {
-                            _pd.set('color', { model: new ColorModel() });
-                            console.log('[LaTeX] Initialized ColorModel');
-                        }
-                        // 也嘗試執行 config callback
-                        var colorCfg = MathJax._.input.tex.Configuration.ConfigurationHandler.get('color');
-                        if (colorCfg && colorCfg.configMethod) {
-                            try { colorCfg.configMethod(_inp3, _inp3.parseOptions); } catch (_) { }
-                        }
+                    var fn = window['mj_ext_' + name];
+                    if (!fn) continue;
+                    try {
+                        fn();
+                        loaded++;
+                    } catch (e) {
+                        console.warn('[LaTeX] ext ' + name + ' threw:', e.message);
                     }
                 }
-            } catch (_) { }
+                // 把 CommandMap 注入 parser 的 macro handler
+                try {
+                    var _inp = MathJax.startup.input;
+                    if (Array.isArray(_inp)) _inp = _inp[0];
+                    var _items = _inp.parseOptions.handlers.get('macro')._configuration.items;
+                    var _mhGet = MathJax._.input.tex.MapHandler.MapHandler;
+                    EXTS.forEach(function (name) {
+                        var exists = _items.some(function (i) {
+                            return (i.item && (i.item._name || i.item.name)) === name;
+                        });
+                        if (exists) return;
+                        var map = null;
+                        try { map = _mhGet.getMap(name); } catch (_) { }
+                        if (!map && window._capturedExtMaps) map = window._capturedExtMaps[name];
+                        if (map) {
+                            _items.push({ item: map, priority: 5 });
+                            console.log('[LaTeX] Injected ' + name + ' map into parser');
+                        }
+                    });
+                } catch (e) { console.warn('[LaTeX] Map injection error:', e.message); }
+
+                // ★ boldsymbol 特殊接線：它不只靠 CommandMap，還需要
+                //   (1) 自訂 token node factory → 在 \boldsymbol{...} 範圍內把產生的 token 標記 fixBold
+                //   (2) postprocessor (rewriteBoldTokens) → 解析後把 fixBold 節點改成 bold mathvariant
+                //   手動注入 CommandMap 不會帶入這兩者，導致 \boldsymbol 解析成功卻沿用一般斜體字形
+                //   （字形 ref 仍是 -I- 而非 -BI-/-B-），肉眼看起來「沒變粗」。
+                try {
+                    var _bsCfg = MathJax._?.input?.tex?.boldsymbol?.BoldsymbolConfiguration;
+                    if (_bsCfg && _bsCfg.createBoldToken && _bsCfg.rewriteBoldTokens) {
+                        var _bi = MathJax.startup.input;
+                        if (Array.isArray(_bi)) _bi = _bi[0];
+                        var _bpo = _bi.parseOptions;
+                        // (1) 安裝 bold token creator（用 flag 確保冪等）
+                        if (_bpo.nodeFactory && !_bpo.nodeFactory._boldsymbolPatched) {
+                            _bpo.nodeFactory.setCreators({ token: _bsCfg.createBoldToken });
+                            _bpo.nodeFactory._boldsymbolPatched = true;
+                            console.log('[LaTeX] boldsymbol token creator installed');
+                        }
+                        // (2) 安裝 postprocessor（用 flag 確保冪等）
+                        if (_bi.postFilters && !_bi._boldsymbolPostAdded) {
+                            _bi.postFilters.add(_bsCfg.rewriteBoldTokens, 10);
+                            _bi._boldsymbolPostAdded = true;
+                            console.log('[LaTeX] boldsymbol postFilter installed');
+                        }
+                    }
+                } catch (e) { console.warn('[LaTeX] boldsymbol wiring error:', e.message); }
+
+                // ★ color 特殊接線：color 套件的 Configuration 帶有 config() 與 options，
+                //   手動注入 CommandMap 不會帶入，導致：
+                //   (1) packageData 沒有 'color' → \textcolor 讀 .model 時 throw
+                //   (2) parseOptions.options.color 缺 padding/borderWidth → \colorbox/\fcolorbox throw
+                //   兩者補上後 \textcolor / \color / \colorbox / \fcolorbox / \definecolor 才會正常。
+                try {
+                    var _cMod = MathJax._?.input?.tex?.color;
+                    var _ColorModel = _cMod && _cMod.ColorUtil && _cMod.ColorUtil.ColorModel;
+                    if (_ColorModel) {
+                        var _ci = MathJax.startup.input;
+                        if (Array.isArray(_ci)) _ci = _ci[0];
+                        var _cpo = _ci.parseOptions;
+                        if (_cpo.packageData && !_cpo.packageData.get('color')) {
+                            _cpo.packageData.set('color', { model: new _ColorModel() });
+                            console.log('[LaTeX] ColorModel set into packageData');
+                        }
+                        if (!_cpo.options.color) {
+                            _cpo.options.color = { padding: '5px', borderWidth: '2px' };
+                            console.log('[LaTeX] color options (padding/borderWidth) set');
+                        }
+                    }
+                } catch (e) { console.warn('[LaTeX] color wiring error:', e.message); }
+
+                return loaded;
+            };
+
+            try {
+                var n = window._latexLoadExtensions();
+                console.log('[LaTeX] startup.ready loaded ' + n + '/5 extensions');
+            } catch (e) { console.warn('[LaTeX] startup ext load error:', e); }
+
+            // （color ColorModel + options 初始化已移入 _latexLoadExtensions，
+            //   確保 color 套件實際載入後才執行，並補上 colorbox/fcolorbox 需要的 options）
 
             // ★ 補充 \therefore / \because（可能不在此版 AMS 中）
             try {
@@ -352,6 +397,17 @@ window.MathJax = {
 function boot() {
     if (window._latexBooted) return;
     window._latexBooted = true;
+
+    // ★ 延遲重試擴充載入：startup.ready 時 MathJax._.input.tex.ParseUtil 可能還沒
+    //   完整暴露 (.default 為 undefined)，導致 enclose bundle 在讀取
+    //   ParseUtil.default.keyvalOptions 時拋錯，連帶讓依賴它的 cancel 也失敗。
+    //   boot() 在字型載入完成後執行，此時 MathJax 完全就緒，再試一次即可成功註冊。
+    try {
+        if (typeof window._latexLoadExtensions === 'function') {
+            var nLoaded = window._latexLoadExtensions();
+            console.log('[LaTeX] boot deferred-loaded ' + nLoaded + '/5 extensions');
+        }
+    } catch (e) { console.warn('[LaTeX] boot ext load error:', e); }
 
     const processed = new WeakSet();
 
@@ -793,6 +849,36 @@ function boot() {
 
         let html = el.innerHTML;
         let changed = false;
+
+        // ★ Discord markdown 復原：Discord 把 `_X_` 解析為 <em>X</em>（會吃掉底線），
+        //   並把 `\,`、`\;`、`\!`、`\:` 等 LaTeX 間距指令的反斜線當轉義字符吃掉。
+        //   這在 LaTeX 下標 (`\int_{-\infty}`) 和微分間距 (`\,dx`) 上尤其致命。
+        //   注意：<em> 可能跨越 $$ 邊界（例如 $$ \int</span><em>{-\infty}...$$ </em>），
+        //   所以必須先把 <em>→_..._ 還原，再讓 $$...$$ matcher 正常匹配。
+        if (discordMode) {
+            html = html.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '_$1_')
+                       .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, '_$1_');
+            // ★ 還原被 Discord 吃掉反斜線的 LaTeX 間距指令 \; \: \! \,
+            //   Discord 把 \; → ; ／ \: → : ／ \! → ! ／ \, → ,（轉義剝除反斜線），
+            //   導致間距渲染成「字面標點」（如 \;=\; 變 ;=;、\exp\! 變 exp!、m\,c 變 m,c）。
+            //   還原策略依各標點「字面用途的罕見程度」分級，避免誤傷正常數學：
+            //   - ; : ：數學中當字面符號極罕見 → 積極還原（後接 空白/命令/運算子/右括號 即視為間距）
+            //           但不碰已是 \; 的（負向 lookbehind \\）以免變成 \\;（換行）。
+            //   - !   ：n! 階乘極常見 → 只在「緊貼反斜線命令」時還原（如 \exp\!\left）。
+            //   - ,   ：逗號列表極常見 → 只在 微分(\,d?) 或 緊貼 \color 群組 時還原，
+            //           其餘逗號(如 (\alpha,\beta)、f(x,y)) 一律保留。
+            const SP = { ';': '\\;', ':': '\\:' };
+            const recoverSpacing = t => t
+                .replace(/(?<!\\)([;:])(?=\s|\\|[+\-=<>)\]}])/g, m => SP[m])
+                .replace(/(?<=[+\-=<>(\[{])(?<!\\)([;:])/g, m => SP[m])
+                .replace(/!(?=\\[a-zA-Z])/g, '\\!')
+                .replace(/(\}|\w)\s*,\s*(d[a-zA-Z])/g, '$1\\,$2')
+                .replace(/,(?=\s*\\color)/g, '\\,')
+                .replace(/([+\-=<>])\s*,/g, '$1\\,');   // 逗號緊跟二元運算子後(如 -\,)：真清單不會這樣寫，安全
+            html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, inner) => '$$' + recoverSpacing(inner) + '$$');
+            html = html.replace(/(?<!\$)\$(?!\$)([\s\S]{1,500}?)(?<!\$)\$(?!\$)/g,
+                                (m, inner) => '$' + recoverSpacing(inner) + '$');
+        }
 
         const slots = [];
         function hold(content) {

@@ -94,7 +94,7 @@ MIT License
 
 ## 版本
 
-v1.10.2
+v1.10.7
 
 ---
 
@@ -189,4 +189,4 @@ Welcome to submit issues and pull requests!
 
 ## Version
 
-v1.10.2
+v1.10.7
