@@ -446,6 +446,16 @@ function boot() {
             return match;
         });
 
+        // ★ 安全網：拆掉「包住數學符號的多餘 \text{}」。
+        //   常見 bot 通病：把帶色希臘字母寫成 \text{\textcolor{red}{\lambda}}，
+        //   但 \text{} 是文字模式，內含 \lambda 等數學命令會報
+        //   "\lambda is only supported in math mode" → 整條公式渲染失敗。
+        //   \textcolor 本身在數學/文字模式皆可用，外層 \text{} 純屬多餘且有害，
+        //   故安全拆除（語意不變、Obsidian 同樣適用）。
+        //   僅在內層含反斜線命令（數學符號）時才拆，純文字的 \text{\textcolor{red}{字}} 不動。
+        cleaned = cleaned.replace(
+            /\\text\{(\\textcolor\{[a-zA-Z]+\}\{[^{}]*\\[^{}]*\})\}/g, '$1');
+
         return decodeHtml(cleaned);
     }
 
@@ -493,7 +503,11 @@ function boot() {
         if (!CJK_RE.test(tex)) return tex;
         CJK_RE.lastIndex = 0;
         // 切出已經是 text-like 的區塊，這些區塊原樣保留
-        const protectRe = /\\(?:text|mathrm|mbox|operatorname)\{[^{}]*\}/g;
+        // ★ 必須涵蓋所有「文字模式」字體指令（\textbf \textit \textsf 等）：
+        //   否則 \textbf{中文} 內的 CJK 會被包成 \textbf{\text{中文}}，
+        //   而 \text 在已是文字模式的 \textbf 內非法 → "\text is only supported in math mode"
+        //   → 整條公式（如含中文標題的 \begin{align}）渲染失敗。
+        const protectRe = /\\(?:text|textbf|textit|textsf|texttt|textrm|textnormal|textsc|textmd|textup|textsl|emph|mathrm|mathbf|mathsf|mathtt|mathit|mbox|hbox|operatorname)\{[^{}]*\}/g;
         let out = '';
         let i = 0;
         let m;
@@ -1061,7 +1075,19 @@ function boot() {
 
         // ★ 記錄渲染後的內容指紋（textContent 長度）
         //   scan() 用此來判斷是否有新內容到達，避免解析失敗的元素被無限重試。
-        processedLen.set(el, el.textContent.length);
+        //   ★ 但若這次「什麼都沒渲染出來」(changed=false)，很可能是 MathJax 冷啟動
+        //     字型/擴充尚未就緒（如 \cfrac 巢狀需動態字型）。此時不立即蓋永久指紋，
+        //     給有限次重試（靠 MutationObserver 後續活動觸發 scan 重掃），
+        //     超過 budget 才永久標記，避免真正無法解析的內容（\xrightarrow 等）無限迴圈。
+        if (changed) {
+            processedLen.set(el, el.textContent.length);
+            renderAttempts.delete(el);
+        } else {
+            const n = (renderAttempts.get(el) || 0) + 1;
+            renderAttempts.set(el, n);
+            if (n >= 8) processedLen.set(el, el.textContent.length);
+            // n < 8：不設指紋 → scan() 經 hasUnrenderedLatex 仍會重試
+        }
     }
 
     // ── 渲染佇列（直接排隊，不依賴 IntersectionObserver）────────────────────
@@ -1074,6 +1100,9 @@ function boot() {
     //   scan() 只有在長度變化（新內容到達）時才重新排隊，防止解析失敗（如 \xrightarrow 無法渲染）
     //   造成的無限重試迴圈。
     const processedLen = new WeakMap();
+    // ★ 渲染失敗重試計數：冷啟動時 MathJax 字型/擴充未就緒會導致 wrapSvg 失敗，
+    //   需給有限次重試空窗；達 budget 才放棄（見 renderEl 結尾）。
+    const renderAttempts = new WeakMap();
     let renderTimer = null;
 
     function flushRender() {
@@ -1140,8 +1169,20 @@ function boot() {
                 if (el.querySelector('.latex-md-table')) continue;
                 // ★ 內容指紋檢查：若 textContent 長度沒有變化，表示沒有新內容到達，
                 //   無需重試（避免解析失敗的元素如 \xrightarrow、\begin{table} 造成無限迴圈）
+                //   ★ 例外：指紋是「成功渲染」才永久有效。若元素仍有未渲染的 LaTeX
+                //     且 renderEl 尚未蓋永久指紋（冷啟動失敗、重試 budget 未用盡），
+                //     則允許重試——靠後續 MutationObserver 活動（其他公式渲染造成的
+                //     DOM 變動）觸發 scan 時把冷啟動失敗的訊息救回來。
                 const lastLen = processedLen.get(el);
-                if (lastLen !== undefined && lastLen === el.textContent.length) continue;
+                if (lastLen !== undefined && lastLen === el.textContent.length) {
+                    // budget 未用盡(冷啟動失敗) 且仍有未渲染 LaTeX → 重試；
+                    // budget 已用盡(真正無法解析，attempts>=8) → 不再重試，避免無限迴圈。
+                    if ((renderAttempts.get(el) || 0) < 8 && hasUnrenderedLatex(el)) {
+                        processed.delete(el);
+                        enqueue(el);
+                    }
+                    continue;
+                }
                 // 已處理過，但內容可能更新了 → 檢查是否還有未渲染的 LaTeX
                 if (hasUnrenderedLatex(el)) {
                     processed.delete(el);
@@ -1197,7 +1238,9 @@ function boot() {
     reRenderExisting();   // 修復舊版渲染殘留（如缺 cancel package 的紅字）
 
     // 多次 retry scan：應對 WebSocket 聊天延遲載入（如 OpenClaw）
-    [300, 1500, 3000, 6000].forEach(ms => setTimeout(() => {
+    //   後段的 10s/15s tick 也涵蓋 MathJax 動態字型較晚載入時，
+    //   冷啟動渲染失敗的訊息（如巢狀 \cfrac）能在字型就緒後被重試救回。
+    [300, 1500, 3000, 6000, 10000, 15000].forEach(ms => setTimeout(() => {
         attachListObserver();
         scan();
     }, ms));
