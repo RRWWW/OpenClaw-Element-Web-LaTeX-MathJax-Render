@@ -20,6 +20,15 @@
 - 支持 Markdown 表格渲染（格子內可含 LaTeX）
 - Discord 側邊欄收合：左緣浮動按鈕一鍵隱藏／展開頻道側邊欄，支援可自訂快捷鍵（預設 `Ctrl+B`）
 
+## 支持的 MathJax 擴展
+
+- **cancel** — 刪除線 `\cancel{x}`
+- **boldsymbol** — 粗體符號 `\boldsymbol{x}`
+- **color** — 顏色 `\color{red}x`
+- **enclose** — 方框 `\enclose{box}{x}`
+- **bbox** — 彩色背景 `\bbox[red]{x}`
+- **AMS symbols** — 額外 AMS 數學符號
+
 ## 相關鏈接
 
 - [Matrix.org](https://matrix.org/) - 去中心化通訊協議
@@ -90,9 +99,10 @@
 - 使用MathJax 4.x進行渲染
 - 支持SVG輸出
 
-## TODO
+## 已知限制 & 未來計畫
 
-- 支持多種擴展：ams, boldsymbol, color, enclose等
+- Firefox 支援（目前僅支援 Chromium 系列）
+- 離線使用（需網路加載字型）
 
 ## 許可證
 
@@ -120,6 +130,15 @@ A Chromium extension for local LaTeX math rendering in Matrix.org Element Web, T
 - Click SVG to copy formulas, etc.
 - Markdown table rendering with LaTeX support in cells
 - Discord sidebar toggle: a floating button on the left edge hides/shows the channel sidebar, with a customizable hotkey (default `Ctrl+B`)
+
+## Supported MathJax Extensions
+
+- **cancel** — strikethrough `\cancel{x}`
+- **boldsymbol** — bold symbols `\boldsymbol{x}`
+- **color** — colors `\color{red}x`
+- **enclose** — boxes `\enclose{box}{x}`
+- **bbox** — colored background `\bbox[red]{x}`
+- **AMS symbols** — extended AMS math symbols
 
 ## Related Links
 
@@ -195,9 +214,10 @@ On Discord web a small floating tab appears at the left-center edge:
 - Uses MathJax 4.x for rendering
 - Supports SVG output
 
-## TODO
+## Known Limitations & Future Plans
 
-- Support various extensions: ams, boldsymbol, color, enclose, etc.
+- Firefox support (currently Chromium-based browsers only)
+- Offline usage (requires network for font loading)
 
 ## License
 
