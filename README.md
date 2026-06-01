@@ -18,6 +18,7 @@
 - 輕量級，無需額外權限
 - 點選SVG可複製公式等
 - 支持 Markdown 表格渲染（格子內可含 LaTeX）
+- Discord 側邊欄收合：左緣浮動按鈕一鍵隱藏／展開頻道側邊欄，支援可自訂快捷鍵（預設 `Ctrl+B`）
 
 ## 相關鏈接
 
@@ -77,6 +78,15 @@
 - 行內公式：`$...$`
 - 區塊公式：`$$...$$`
 
+### Discord 側邊欄收合
+
+在 Discord 網頁版會於畫面左緣中央出現一個浮動小標籤：
+
+- 點一下：隱藏／展開頻道側邊欄
+- 快捷鍵：預設 `Ctrl+B`
+- 自訂快捷鍵：在浮動鈕上按右鍵進入錄製模式，按下新組合鍵即儲存（`Esc` 取消）
+- 收合狀態與自訂快捷鍵會記憶於 `localStorage`，重整後保留
+
 - 使用MathJax 4.x進行渲染
 - 支持SVG輸出
 
@@ -94,7 +104,7 @@ MIT License
 
 ## 版本
 
-v1.10.10
+v1.11.0
 
 ---
 
@@ -109,6 +119,7 @@ A Chromium extension for local LaTeX math rendering in Matrix.org Element Web, T
 - Lightweight, no additional permissions required
 - Click SVG to copy formulas, etc.
 - Markdown table rendering with LaTeX support in cells
+- Discord sidebar toggle: a floating button on the left edge hides/shows the channel sidebar, with a customizable hotkey (default `Ctrl+B`)
 
 ## Related Links
 
@@ -170,6 +181,15 @@ After installation, the extension will automatically render LaTeX formulas in El
 
 Click on the rendered SVG image to copy the LaTeX code.
 
+### Discord Sidebar Toggle
+
+On Discord web a small floating tab appears at the left-center edge:
+
+- Click: hide/show the channel sidebar
+- Hotkey: default `Ctrl+B`
+- Customize the hotkey: right-click the floating button to enter recording mode, then press a new key combination to save (`Esc` to cancel)
+- The collapsed state and custom hotkey are persisted in `localStorage`
+
 ## Technical Details
 
 - Uses MathJax 4.x for rendering
@@ -189,4 +209,4 @@ Welcome to submit issues and pull requests!
 
 ## Version
 
-v1.10.10
+v1.11.0

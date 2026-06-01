@@ -334,6 +334,22 @@ window.MathJax = {
             overscroll-behavior: contain;
             scroll-snap-type: none;
             -webkit-overflow-scrolling: touch;
+            /* 細捲軸，色彩跟著文字色（currentColor）半透明，與 markdown table 一致 */
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in srgb, currentColor 22%, transparent) transparent;
+        }
+        .latex-rendered.latex-display::-webkit-scrollbar {
+            height: 8px;
+        }
+        .latex-rendered.latex-display::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .latex-rendered.latex-display::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, currentColor 22%, transparent);
+            border-radius: 4px;
+        }
+        .latex-rendered.latex-display:hover::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, currentColor 38%, transparent);
         }
         .latex-rendered > mjx-container { pointer-events: none; }
         .latex-rendered .latex-src {
@@ -356,9 +372,40 @@ window.MathJax = {
             font: inherit;
         }
         /* Markdown 表格 */
+        /* 外層捲動容器：寬表格超過訊息寬度時提供水平卷軸 */
+        .latex-md-table-wrap {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            margin: 6px 0;
+            overscroll-behavior-x: contain;
+            -webkit-overflow-scrolling: touch;
+            /* 細捲軸，色彩跟著文字色（currentColor）半透明，明暗主題都不突兀 */
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in srgb, currentColor 22%, transparent) transparent;
+        }
+        .latex-md-table-wrap::-webkit-scrollbar {
+            height: 8px;
+        }
+        .latex-md-table-wrap::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .latex-md-table-wrap::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, currentColor 22%, transparent);
+            border-radius: 4px;
+        }
+        .latex-md-table-wrap:hover::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, currentColor 38%, transparent);
+        }
+        /* Markdown 水平線：跟文字色半透明，融入背景 */
+        .latex-md-hr {
+            border: none;
+            border-top: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+            margin: 8px 0;
+            height: 0;
+        }
         .latex-md-table {
             border-collapse: collapse;
-            margin: 6px 0;
             color: inherit;
             font-size: inherit;
         }
@@ -792,7 +839,8 @@ function boot() {
     // 內容變動後需要乾淨重新處理時使用。
     function unwrapRendered(el) {
         // 移除已渲染的 Markdown 表格（無法還原 markdown 原文，直接移除讓重新渲染）
-        el.querySelectorAll('.latex-md-table').forEach(t => t.remove());
+        //   連同外層捲動容器一併移除，避免殘留空的 wrapper。
+        el.querySelectorAll('.latex-md-table-wrap, .latex-md-table, .latex-md-hr').forEach(t => t.remove());
         // 還原 LaTeX span → 原始 $...$ 文字
         const rendered = el.querySelectorAll('.latex-rendered');
         for (const r of rendered) {
@@ -1026,13 +1074,15 @@ function boot() {
                             const prefix = tLines[0].raw.match(/^((?:<[^>]*>)*)/)?.[1] || '';
                             const suffix = tLines[tLines.length - 1].raw.match(/((?:<\/[^>]*>)*)$/)?.[1] || '';
 
-                            let t = '<table class="latex-md-table"><thead><tr>';
+                            // ★ 外層包一個可水平捲動的容器，避免寬表格在 Discord
+                            //   等平台溢出卻沒有卷軸（white-space:nowrap 會撐寬）。
+                            let t = '<div class="latex-md-table-wrap"><table class="latex-md-table"><thead><tr>';
                             heads.forEach(h => t += `<th>${h}</th>`);
                             t += '</tr></thead><tbody>';
                             body.forEach(cells => {
                                 t += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
                             });
-                            t += '</tbody></table>';
+                            t += '</tbody></table></div>';
 
                             out.push(prefix + t + suffix);
                             changed = true;
@@ -1057,6 +1107,18 @@ function boot() {
             }
             if (tLines.length) flushTable();
             html = out.join('\n');
+        }
+
+        // ── Markdown 水平線（hr）渲染 ─────────────────────────────────────────
+        //   ★ 搭便車策略：只在這則訊息已因公式/表格進入渲染（changed=true）時才處理，
+        //     hr 絕不單獨當觸發條件，避免為了一條裝飾線而擴大 Discord overlay 接管
+        //     範圍（那正是 React reconciliation 崩潰的來源）。
+        //   只認「整行為同一種符號（- 或 * 或 _）重複 3 次以上、允許中間空白」者，
+        //   用原地取代保留其他行的 <br>（避免弄丟換行）。\2 反向參照確保符號同種。
+        if (changed) {
+            html = html.replace(
+                /(^|\n|<br\s*\/?>)[ \t]*([-*_])(?:[ \t]*\2){2,}[ \t]*(?=\n|<br\s*\/?>|$)/gi,
+                '$1<hr class="latex-md-hr">');
         }
 
         // ── 還原所有佔位符 ──
@@ -1166,7 +1228,8 @@ function boot() {
                 // ★ 已渲染表格的元素不重新處理：
                 //   unwrapRendered 會移除 <table> 但無法還原原本的 pipe 文字，
                 //   導致表格永久消失。若表格存在，視為完整渲染，不重新排隊。
-                if (el.querySelector('.latex-md-table')) continue;
+                //   hr 同理（無法還原 --- 原文），一併視為完整渲染。
+                if (el.querySelector('.latex-md-table, .latex-md-hr')) continue;
                 // ★ 內容指紋檢查：若 textContent 長度沒有變化，表示沒有新內容到達，
                 //   無需重試（避免解析失敗的元素如 \xrightarrow、\begin{table} 造成無限迴圈）
                 //   ★ 例外：指紋是「成功渲染」才永久有效。若元素仍有未渲染的 LaTeX
@@ -1245,3 +1308,145 @@ function boot() {
         scan();
     }, ms));
 }
+
+// ── Discord 側邊欄收合：浮動按鈕 + 可自訂快捷鍵 ─────────────────────────────
+//   只在 Discord 生效。收合狀態與自訂快捷鍵存於 localStorage，重整後保留。
+//   ‧ 點浮動鈕：切換隱藏／展開頻道側邊欄
+//   ‧ 預設快捷鍵 Ctrl+B 同樣切換
+//   ‧ 右鍵浮動鈕：進入錄製模式，按下新組合鍵即可自訂（Esc 取消）
+(function discordSidebarToggle() {
+    if (!/(^|\.)discord\.com$/.test(location.hostname)) return;
+    if (window._latexSidebarToggleBooted) return;
+    window._latexSidebarToggleBooted = true;
+
+    const LS_STATE = 'latexDiscordSidebarHidden';
+    const LS_HOTKEY = 'latexDiscordSidebarHotkey';
+    const DEFAULT_HOTKEY = { ctrl: true, alt: false, shift: false, meta: false, key: 'b' };
+
+    function loadHotkey() {
+        try {
+            const v = JSON.parse(localStorage.getItem(LS_HOTKEY));
+            if (v && typeof v.key === 'string') return v;
+        } catch (e) { /* ignore */ }
+        return { ...DEFAULT_HOTKEY };
+    }
+    let hotkey = loadHotkey();
+
+    function hotkeyLabel(h) {
+        const parts = [];
+        if (h.ctrl) parts.push('Ctrl');
+        if (h.alt) parts.push('Alt');
+        if (h.shift) parts.push('Shift');
+        if (h.meta) parts.push('Meta');
+        parts.push((h.key || '').length === 1 ? h.key.toUpperCase() : h.key);
+        return parts.join('+');
+    }
+
+    // 樣式：收合狀態隱藏頻道側邊欄；浮動鈕固定在左緣
+    const style = document.createElement('style');
+    style.textContent = `
+        body.latex-sidebar-hidden [class*="sidebarList_"] {
+            display: none !important;
+        }
+        #latex-sidebar-toggle {
+            position: fixed; left: 0; top: 50%; transform: translateY(-50%);
+            z-index: 100000;
+            width: 18px; height: 56px;
+            display: flex; align-items: center; justify-content: center;
+            border: none; border-radius: 0 8px 8px 0;
+            background: var(--background-tertiary, rgba(0,0,0,.55));
+            color: var(--interactive-normal, #b5bac1);
+            cursor: pointer; opacity: .35;
+            transition: opacity .15s, background .15s, width .15s;
+            font-size: 13px; line-height: 1; padding: 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,.3);
+        }
+        #latex-sidebar-toggle:hover { opacity: 1; width: 22px; color: #fff; }
+        #latex-sidebar-toggle.recording {
+            opacity: 1; width: auto; padding: 0 8px;
+            background: var(--status-danger, #d83c3e); color: #fff;
+            font-size: 11px; white-space: nowrap;
+        }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+
+    const btn = document.createElement('button');
+    btn.id = 'latex-sidebar-toggle';
+    btn.setAttribute('aria-label', 'Toggle Discord sidebar');
+
+    function isHidden() { return document.body.classList.contains('latex-sidebar-hidden'); }
+
+    function render() {
+        if (btn.classList.contains('recording')) return;
+        btn.textContent = isHidden() ? '›' : '‹';
+        btn.title = `側邊欄：${isHidden() ? '已隱藏' : '顯示中'}（快捷鍵 ${hotkeyLabel(hotkey)}，右鍵改鍵）`;
+    }
+
+    function setHidden(hidden) {
+        document.body.classList.toggle('latex-sidebar-hidden', hidden);
+        try { localStorage.setItem(LS_STATE, hidden ? '1' : '0'); } catch (e) { /* ignore */ }
+        render();
+    }
+    function toggle() { setHidden(!isHidden()); }
+
+    // 還原上次狀態
+    let initialHidden = false;
+    try { initialHidden = localStorage.getItem(LS_STATE) === '1'; } catch (e) { /* ignore */ }
+    setHidden(initialHidden);
+
+    btn.addEventListener('click', (e) => { e.preventDefault(); toggle(); });
+
+    // 右鍵：錄製新快捷鍵
+    let recording = false;
+    btn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        recording = true;
+        btn.classList.add('recording');
+        btn.textContent = '按下快捷鍵… (Esc 取消)';
+    });
+    function stopRecording() {
+        recording = false;
+        btn.classList.remove('recording');
+        render();
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (recording) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.key === 'Escape') { stopRecording(); return; }
+            // 只按修飾鍵不算，等真正的按鍵
+            if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+            hotkey = {
+                ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey,
+                key: e.key.length === 1 ? e.key.toLowerCase() : e.key
+            };
+            try { localStorage.setItem(LS_HOTKEY, JSON.stringify(hotkey)); } catch (err) { /* ignore */ }
+            stopRecording();
+            return;
+        }
+        // 觸發快捷鍵（避免在輸入框誤觸：純無修飾鍵時跳過已由下方組合鍵保證）
+        const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+        if (e.ctrlKey === hotkey.ctrl && e.altKey === hotkey.alt &&
+            e.shiftKey === hotkey.shift && e.metaKey === hotkey.meta && k === hotkey.key) {
+            // 至少要有一個修飾鍵，避免單鍵在打字時誤觸
+            if (hotkey.ctrl || hotkey.alt || hotkey.meta) {
+                e.preventDefault();
+                toggle();
+            }
+        }
+    }, true);
+
+    function mount() {
+        if (!document.body) return;
+        if (!btn.isConnected) document.body.appendChild(btn);
+        render();
+    }
+    mount();
+    // Discord 切頻道/重繪可能動到 body class，定期確保按鈕仍在、狀態一致
+    new MutationObserver(() => {
+        if (!btn.isConnected && document.body) document.body.appendChild(btn);
+    }).observe(document.documentElement, { childList: true, subtree: true });
+
+    window._latexSidebarToggle = toggle;
+})();
