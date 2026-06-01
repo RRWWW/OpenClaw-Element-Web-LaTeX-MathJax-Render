@@ -3,12 +3,26 @@
   "name": "LaTeX render",
   "version": "1.11.0",
   "description": "Local LaTeX Renderer for Element, Telegram, OpenClaw, Discord",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "permissions": [
     "scripting",
     "clipboardWrite"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://app.element.io/*",
+    "https://*.element.io/*",
+    "https://web.telegram.org/*",
+    "https://discord.com/*",
+    "https://*.discord.com/*",
+    "https://openclaw.org/*",
+    "https://*.openclaw.org/*",
+    "https://hermes-ai.org/*",
+    "https://*.hermes-ai.org/*",
+    "https://*.devtunnels.ms/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -16,8 +30,16 @@
   "content_scripts": [
     {
       "matches": [
-        "http://*/*",
-        "https://*/*"
+        "https://app.element.io/*",
+        "https://*.element.io/*",
+        "https://web.telegram.org/*",
+        "https://discord.com/*",
+        "https://*.discord.com/*",
+        "https://openclaw.org/*",
+        "https://*.openclaw.org/*",
+        "https://hermes-ai.org/*",
+        "https://*.hermes-ai.org/*",
+        "https://*.devtunnels.ms/*"
       ],
       "js": [
         "inject_url.js"
@@ -27,8 +49,16 @@
     },
     {
       "matches": [
-        "http://*/*",
-        "https://*/*"
+        "https://app.element.io/*",
+        "https://*.element.io/*",
+        "https://web.telegram.org/*",
+        "https://discord.com/*",
+        "https://*.discord.com/*",
+        "https://openclaw.org/*",
+        "https://*.openclaw.org/*",
+        "https://hermes-ai.org/*",
+        "https://*.hermes-ai.org/*",
+        "https://*.devtunnels.ms/*"
       ],
       "js": [
         "content.js",
@@ -45,7 +75,16 @@
         "fonts/svg/dynamic/*.js"
       ],
       "matches": [
-        "<all_urls>"
+        "https://app.element.io/*",
+        "https://*.element.io/*",
+        "https://web.telegram.org/*",
+        "https://discord.com/*",
+        "https://*.discord.com/*",
+        "https://openclaw.org/*",
+        "https://*.openclaw.org/*",
+        "https://hermes-ai.org/*",
+        "https://*.hermes-ai.org/*",
+        "https://*.devtunnels.ms/*"
       ]
     }
   ]

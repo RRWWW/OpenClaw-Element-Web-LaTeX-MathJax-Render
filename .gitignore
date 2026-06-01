@@ -1,1 +1,11 @@
 .claude/
+
+# build artifacts & working dirs
+*.zip
+_icon/
+_store/
+_pkg/
+fonts-bundle.js
+
+# OS junk
+._*
